@@ -7,8 +7,6 @@ use alloc::vec;
 use alloc::vec::Vec;
 use core::ops::{Mul, Range};
 
-use crate::MAX_EXTREMA;
-use crate::{Line, QuadSpline, Vec2};
 use arrayvec::ArrayVec;
 
 use crate::common::{
@@ -16,8 +14,9 @@ use crate::common::{
     GAUSS_LEGENDRE_COEFFS_8, GAUSS_LEGENDRE_COEFFS_8_HALF,
 };
 use crate::{
-    Affine, Nearest, ParamCurve, ParamCurveArclen, ParamCurveArea, ParamCurveCurvature,
-    ParamCurveDeriv, ParamCurveExtrema, ParamCurveNearest, PathEl, Point, QuadBez, Rect, Shape,
+    Affine, ExactPathElements, Line, Nearest, ParamCurve, ParamCurveArclen, ParamCurveArea,
+    ParamCurveCurvature, ParamCurveDeriv, ParamCurveExtrema, ParamCurveNearest, PathEl, Point,
+    QuadBez, QuadSpline, Rect, Shape, Vec2, MAX_EXTREMA,
 };
 
 #[cfg(not(feature = "std"))]
@@ -495,6 +494,15 @@ impl Shape for CubicBez {
     #[inline]
     fn bounding_box(&self) -> Rect {
         ParamCurveExtrema::bounding_box(self)
+    }
+}
+
+impl ExactPathElements for CubicBez {
+    type ExactPathElementsIter<'iter> = <CubicBez as Shape>::PathElementsIter<'iter>;
+
+    #[inline]
+    fn exact_path_elements(&self) -> Self::ExactPathElementsIter<'_> {
+        self.path_elements(0.)
     }
 }
 

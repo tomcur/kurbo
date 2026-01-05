@@ -8,9 +8,9 @@ use core::ops::{Add, Mul, Range, Sub};
 use arrayvec::ArrayVec;
 
 use crate::{
-    Affine, Nearest, ParamCurve, ParamCurveArclen, ParamCurveArea, ParamCurveCurvature,
-    ParamCurveDeriv, ParamCurveExtrema, ParamCurveNearest, PathEl, Point, Rect, Shape, Vec2,
-    DEFAULT_ACCURACY, MAX_EXTREMA,
+    Affine, ExactPathElements, Nearest, ParamCurve, ParamCurveArclen, ParamCurveArea,
+    ParamCurveCurvature, ParamCurveDeriv, ParamCurveExtrema, ParamCurveNearest, PathEl, Point,
+    Rect, Shape, Vec2, DEFAULT_ACCURACY, MAX_EXTREMA,
 };
 
 /// A single line.
@@ -329,6 +329,15 @@ impl Shape for Line {
     #[inline(always)]
     fn as_line(&self) -> Option<Line> {
         Some(*self)
+    }
+}
+
+impl ExactPathElements for Line {
+    type ExactPathElementsIter<'iter> = <Line as Shape>::PathElementsIter<'iter>;
+
+    #[inline]
+    fn exact_path_elements(&self) -> Self::ExactPathElementsIter<'_> {
+        self.path_elements(0.)
     }
 }
 

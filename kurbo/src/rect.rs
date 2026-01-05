@@ -7,7 +7,8 @@ use core::fmt;
 use core::ops::{Add, Sub};
 
 use crate::{
-    Axis, Ellipse, Insets, PathEl, Point, RoundedRect, RoundedRectRadii, Shape, Size, Vec2,
+    Axis, Ellipse, ExactPathElements, Insets, PathEl, Point, RoundedRect, RoundedRectRadii, Shape,
+    Size, Vec2,
 };
 
 #[cfg(not(feature = "std"))]
@@ -771,6 +772,15 @@ impl Shape for Rect {
     #[inline]
     fn contains(&self, pt: Point) -> bool {
         self.contains(pt)
+    }
+}
+
+impl ExactPathElements for Rect {
+    type ExactPathElementsIter<'iter> = <Rect as Shape>::PathElementsIter<'iter>;
+
+    #[inline]
+    fn exact_path_elements(&self) -> Self::ExactPathElementsIter<'_> {
+        self.path_elements(0.)
     }
 }
 

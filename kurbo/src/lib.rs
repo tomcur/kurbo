@@ -176,7 +176,7 @@ pub use crate::quadspline::QuadSpline;
 pub use crate::rect::{Rect, RectPathIter};
 pub use crate::rounded_rect::{RoundedRect, RoundedRectPathIter};
 pub use crate::rounded_rect_radii::RoundedRectRadii;
-pub use crate::shape::Shape;
+pub use crate::shape::{ExactPathElements, Shape};
 pub use crate::size::Size;
 pub use crate::stroke::{
     dash, stroke, stroke_with, Cap, Dashes, Join, Stroke, StrokeCtx, StrokeOptLevel, StrokeOpts,

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 //! Triangle shape
-use crate::{Circle, PathEl, Point, Rect, Shape, Vec2};
+use crate::{Circle, ExactPathElements, PathEl, Point, Rect, Shape, Vec2};
 
 use core::cmp::*;
 use core::f64::consts::FRAC_PI_4;
@@ -235,6 +235,15 @@ impl Shape for Triangle {
             self.a.x.max(self.b.x.max(self.c.x)),
             self.a.y.max(self.b.y.max(self.c.y)),
         )
+    }
+}
+
+impl ExactPathElements for Triangle {
+    type ExactPathElementsIter<'iter> = <Triangle as Shape>::PathElementsIter<'iter>;
+
+    #[inline]
+    fn exact_path_elements(&self) -> Self::ExactPathElementsIter<'_> {
+        self.path_elements(0.)
     }
 }
 

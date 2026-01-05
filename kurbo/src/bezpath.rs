@@ -14,10 +14,10 @@ use alloc::vec::Vec;
 use arrayvec::ArrayVec;
 
 use crate::common::{solve_cubic, solve_quadratic};
-use crate::MAX_EXTREMA;
 use crate::{
-    Affine, CubicBez, Line, Nearest, ParamCurve, ParamCurveArclen, ParamCurveArea,
-    ParamCurveExtrema, ParamCurveNearest, Point, QuadBez, Rect, Shape, TranslateScale, Vec2,
+    Affine, CubicBez, ExactPathElements, Line, Nearest, ParamCurve, ParamCurveArclen,
+    ParamCurveArea, ParamCurveExtrema, ParamCurveNearest, Point, QuadBez, Rect, Shape,
+    TranslateScale, Vec2, MAX_EXTREMA,
 };
 
 #[cfg(not(feature = "std"))]
@@ -1389,6 +1389,15 @@ impl Shape for BezPath {
     #[inline(always)]
     fn as_path_slice(&self) -> Option<&[PathEl]> {
         Some(&self.0)
+    }
+}
+
+impl ExactPathElements for BezPath {
+    type ExactPathElementsIter<'iter> = <BezPath as Shape>::PathElementsIter<'iter>;
+
+    #[inline]
+    fn exact_path_elements(&self) -> Self::ExactPathElementsIter<'_> {
+        self.path_elements(0.)
     }
 }
 

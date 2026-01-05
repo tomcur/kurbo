@@ -8,12 +8,12 @@ use core::ops::{Mul, Range};
 use arrayvec::ArrayVec;
 
 use crate::common::solve_cubic;
-use crate::MAX_EXTREMA;
 use crate::{
     Affine, CubicBez, Line, Nearest, ParamCurve, ParamCurveArclen, ParamCurveArea,
     ParamCurveCurvature, ParamCurveDeriv, ParamCurveExtrema, ParamCurveNearest, PathEl, Point,
     Rect, Shape,
 };
+use crate::{ExactPathElements, MAX_EXTREMA};
 
 #[cfg(not(feature = "std"))]
 use crate::common::FloatFuncs;
@@ -142,6 +142,15 @@ impl Shape for QuadBez {
     #[inline]
     fn bounding_box(&self) -> Rect {
         ParamCurveExtrema::bounding_box(self)
+    }
+}
+
+impl ExactPathElements for QuadBez {
+    type ExactPathElementsIter<'iter> = <QuadBez as Shape>::PathElementsIter<'iter>;
+
+    #[inline]
+    fn exact_path_elements(&self) -> Self::ExactPathElementsIter<'_> {
+        self.path_elements(0.)
     }
 }
 

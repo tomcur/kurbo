@@ -227,3 +227,59 @@ impl<'a, T: Shape> Shape for &'a T {
         (*self).as_path_slice()
     }
 }
+
+/// A generic trait for shapes that can be mapped exactly to Bézier path elements (i.e., without
+/// approximation).
+pub trait ExactPathElements: Shape {
+    /// The iterator returned by the [`Self::exact_path_elements`] method.
+    ///
+    /// [`path_elements`]: Shape::path_elements
+    type ExactPathElementsIter<'iter>: Iterator<Item = PathEl> + 'iter
+    where
+        Self: 'iter;
+
+    /// Returns an iterator over this shape expressed as exact [`PathEl`]s;
+    /// that is, as exact Bézier path _elements_.
+    ///
+    /// These path elements are exact, in the sense that no approximation is required
+    /// to calculate them. This is not possible for all shapes, but is possible for all
+    /// finite polygons and other piecewise-cubic parametric curves. Some shapes will
+    /// need to be approximated, which [`Shape::path_elements`] does instead.
+    ///
+    /// All shapes can be represented as (approximated) Béziers, but in many
+    /// situations (such as when interfacing with a platform drawing API) there are
+    /// more efficient native types for specific concrete shapes. In this case,
+    /// the user should exhaust [`Shape`]'s `as_` methods ([`Shape::as_rect`],
+    /// [`Shape::as_line`], etc.) before converting to a [`BezPath`], as those are
+    /// likely to be more efficient.
+    ///
+    /// In many cases, shapes are able to iterate their elements without
+    /// allocating; however creating a [`BezPath`] object always allocates.
+    /// If you need an owned [`BezPath`] you can use [`BezPath::from_iter`] (or
+    /// [`Iterator::collect`]).
+    fn exact_path_elements(&self) -> Self::ExactPathElementsIter<'_>;
+
+    /// Returns an iterator over this shape expressed as exact Bézier path
+    /// _segments_ ([`PathSeg`]s).
+    ///
+    /// The allocation behaviour is the same as for [`ExactPathElements::exact_path_elements`].
+    ///
+    /// [`PathSeg`]: crate::PathSeg
+    #[inline]
+    fn exact_path_segments(&self) -> Segments<Self::ExactPathElementsIter<'_>> {
+        segments(self.exact_path_elements())
+    }
+}
+
+impl<'a, T: ExactPathElements> ExactPathElements for &'a T {
+    type ExactPathElementsIter<'iter>
+        = T::ExactPathElementsIter<'iter>
+    where
+        T: 'iter,
+        'a: 'iter;
+
+    #[inline]
+    fn exact_path_elements(&self) -> Self::ExactPathElementsIter<'_> {
+        (*self).exact_path_elements()
+    }
+}
