@@ -411,13 +411,12 @@ impl Affine {
     /// (semi-major axis) of the Ellipse.
     ///
     /// [schatten]: <https://en.wikipedia.org/w/index.php?title=Matrix_norm&oldid=1348997593#Schatten_norms>
-    #[inline]
     pub fn spectral_norm(self) -> f64 {
         // Note a different calculation, returning the `_squared` form like our nuclear and
         // Frobenius norms, could be `0.5 (frob^2 + sqrt(frob^4 - 4 det^2))`. In terms of operations
         // it's a wash: one fewer sqrt if the user actually wants the squared form, but it uses more
         // muls. More importantly, that form has worse numeric conditioning.
-        self.svd().0.x
+        self.singular_values().x
     }
 
     /// Compute the inverse transform.
@@ -476,43 +475,17 @@ impl Affine {
             || self.0[5].is_nan()
     }
 
-    /// Compute the singular value decomposition of the linear transformation (ignoring the
+    /// Compute the singular values of the linear part of this transform (ignoring the
     /// translation).
     ///
-    /// All non-degenerate linear transformations can be represented as
-    ///
-    ///  1. a rotation about the origin.
-    ///  2. a scaling along the x and y axes
-    ///  3. another rotation about the origin
-    ///
-    /// composed together. Decomposing a 2x2 matrix in this way is called a "singular value
-    /// decomposition" and is written `U Σ V^T`, where U and V^T are orthogonal (rotations) and Σ
-    /// is a diagonal matrix (a scaling).
-    ///
-    /// Since currently this function is used to calculate ellipse radii and rotation from an
-    /// affine map on the unit circle, we don't calculate V^T, since a rotation of the unit (or
-    /// any) circle about its center always results in the same circle. This is the reason that an
-    /// ellipse mapped using an affine map is always an ellipse.
+    /// These are the radii (semi-axes) of the ellipse obtained by applying the linear part of
+    /// this transform to the unit circle. The value along the x-axis is guaranteed to be greater
+    /// than or equal to the value along the y-axis.
     ///
     /// Will return NaNs if the matrix (or equivalently the linear map) is non-finite.
-    ///
-    /// The first part of the returned tuple is the scaling, the second part is the angle of
-    /// rotation (in radians). The scaling along the x-axis is guaranteed to be greater than or
-    /// equal to the scaling along the y-axis.
-    //
-    // Note: though this does quite some computation, we are often interested only in specific
-    // components of the result. Hence this is marked `#[inline(always)]`, to give the compiler a
-    // good chance at eliminating dead code.
-    #[inline(always)]
-    pub(crate) fn svd(self) -> (Vec2, f64) {
+    #[inline]
+    pub(crate) fn singular_values(self) -> Vec2 {
         let [a, b, c, d, _, _] = self.0;
-        let a2 = a * a;
-        let b2 = b * b;
-        let c2 = c * c;
-        let d2 = d * d;
-        let ab = a * b;
-        let cd = c * d;
-        let angle = 0.5 * (2.0 * (ab + cd)).atan2(a2 - b2 + c2 - d2);
 
         // Given matrix A = [ a c ]
         //                  [ b d ]
@@ -549,13 +522,36 @@ impl Affine {
         // and similarly σ2 = 1/2 |S1 - S2|
         let s1 = ((a + d).powi(2) + (b - c).powi(2)).sqrt();
         let s2 = ((a - d).powi(2) + (b + c).powi(2)).sqrt();
-        (
-            Vec2 {
-                x: 0.5 * (s1 + s2),
-                y: 0.5 * (s1 - s2).abs(),
-            },
-            angle,
-        )
+        Vec2 {
+            x: 0.5 * (s1 + s2),
+            y: 0.5 * (s1 - s2).abs(),
+        }
+    }
+
+    /// Compute the rotation angle (in radians) of the singular value decomposition of the linear
+    /// part of this transform (ignoring the translation).
+    ///
+    /// All non-degenerate linear transformations can be represented as
+    ///
+    ///  1. a rotation about the origin.
+    ///  2. a scaling along the x and y axes
+    ///  3. another rotation about the origin
+    ///
+    /// composed together. Decomposing a 2x2 matrix in this way is called a "singular value
+    /// decomposition" and is written `U Σ V^T`, where U and V^T are orthogonal (rotations) and Σ
+    /// is a diagonal matrix (a scaling). This returns the angle of `U`; the diagonal entries of
+    /// `Σ` are available via [`Affine::singular_values`].
+    ///
+    /// Since currently this function is used to calculate ellipse rotation from an affine map on
+    /// the unit circle, we don't calculate V^T, since a rotation of the unit (or any) circle about
+    /// its center always results in the same circle. This is the reason that an ellipse mapped
+    /// using an affine map is always an ellipse.
+    ///
+    /// Will return NaN if the matrix (or equivalently the linear map) is non-finite.
+    #[inline]
+    pub(crate) fn svd_rotation(self) -> f64 {
+        let [a, b, c, d, _, _] = self.0;
+        0.5 * (2.0 * (a * b + c * d)).atan2(a * a - b * b + c * c - d * d)
     }
 
     /// Returns the translation part of this affine map (`(self.0[4], self.0[5])`).
@@ -763,8 +759,10 @@ mod tests {
         let a_no_translate = a.with_translation(Vec2::ZERO);
 
         // translation should have no effect
-        let (scale, rotation) = a.svd();
-        let (scale_no_translate, rotation_no_translate) = a_no_translate.svd();
+        let scale = a.singular_values();
+        let rotation = a.svd_rotation();
+        let scale_no_translate = a_no_translate.singular_values();
+        let rotation_no_translate = a_no_translate.svd_rotation();
         assert_near(scale.to_point(), scale_no_translate.to_point());
         assert!((rotation - rotation_no_translate).abs() <= 1e-9);
 
@@ -777,9 +775,8 @@ mod tests {
         // singular affine
         let a = Affine::new([0., 0., 0., 0., 5., 6.]);
         assert_eq!(a.determinant(), 0.);
-        let (scale, rotation) = a.svd();
-        assert_eq!(scale, Vec2::new(0., 0.));
-        assert_eq!(rotation, 0.);
+        assert_eq!(a.singular_values(), Vec2::new(0., 0.));
+        assert_eq!(a.svd_rotation(), 0.);
     }
 
     #[test]
@@ -787,40 +784,39 @@ mod tests {
         // Test a few known singular values.
         let mat = |a, b, c, d| Affine::new([a, b, c, d, 0., 0.]);
 
-        let s = mat(1., 0., 0., 1.).svd().0;
+        let s = mat(1., 0., 0., 1.).singular_values();
         assert_near(s.to_point(), Point::new(1., 1.));
 
-        let s = mat(1., 0., 0., -1.).svd().0;
+        let s = mat(1., 0., 0., -1.).singular_values();
         assert_near(s.to_point(), Point::new(1., 1.));
 
-        let s = mat(1., 1., 1., 1.).svd().0;
+        let s = mat(1., 1., 1., 1.).singular_values();
         assert_near(s.to_point(), Point::new(2., 0.));
 
-        let s = mat(1., 1., 1., 1.).svd().0;
+        let s = mat(1., 1., 1., 1.).singular_values();
         assert_near(s.to_point(), Point::new(2., 0.));
 
-        let s = mat(0., 0., 1., 0.).svd().0;
+        let s = mat(0., 0., 1., 0.).singular_values();
         assert_near(s.to_point(), Point::new(1., 0.));
 
         // The singular values are the scaling of the affine map. So let's test that.
         let s = Affine::scale_non_uniform(4., 8.)
             .then_rotate_about(42_f64.to_radians(), (-2., 50.))
-            .svd()
-            .0;
+            .singular_values();
         assert_near(s.to_point(), Point::new(8., 4.));
 
         // Correctly handles negative scaling (singular values are necessarily non-negative).
-        let s = Affine::scale_non_uniform(-20., 3.).svd().0;
+        let s = Affine::scale_non_uniform(-20., 3.).singular_values();
         assert_near(s.to_point(), Point::new(20., 3.));
-        let s = Affine::scale_non_uniform(-20., -3.).svd().0;
+        let s = Affine::scale_non_uniform(-20., -3.).singular_values();
         assert_near(s.to_point(), Point::new(20., 3.));
-        let s = Affine::scale_non_uniform(20., -3.).svd().0;
+        let s = Affine::scale_non_uniform(20., -3.).singular_values();
         assert_near(s.to_point(), Point::new(20., 3.));
 
         // One more property: given a full-rank transform, the product of its singular values
         // should be equal to its absolute determinant.
         let m = mat(10., 9., -2.5, 3.3333);
-        let s = m.svd().0;
+        let s = m.singular_values();
         let prod = s.x * s.y;
         let det = m.determinant().abs();
         assert!(
